@@ -6,13 +6,14 @@ from datetime import date
 
 from database import (
     create_table,
+    create_user,
+    authenticate_user,
     add_transaction,
     get_transactions,
     set_monthly_budget,
     get_monthly_budget,
     update_transaction,
     delete_transaction
-
 )
 
 # --------------------------------
@@ -204,6 +205,70 @@ st.caption("Your personal financial management dashboard")
 create_table()
 
 # --------------------------------
+# USER AUTHENTICATION
+# --------------------------------
+
+if "user_id" not in st.session_state:
+    st.session_state.user_id = None
+if "username" not in st.session_state:
+    st.session_state.username = None
+
+if st.session_state.user_id is None:
+    st.title("🔐 Welcome to Smart Expense Tracker")
+    st.write("Sign in to access your personal financial dashboard, or create a new account.")
+
+    login_tab, signup_tab = st.tabs(["Login", "Create Account"])
+
+    with login_tab:
+        with st.form("login_form"):
+            login_username = st.text_input("Username", key="login_username")
+            login_password = st.text_input("Password", type="password", key="login_password")
+            login_submit = st.form_submit_button("Login", use_container_width=True)
+
+        if login_submit:
+            result = authenticate_user(login_username.strip(), login_password)
+            if result:
+                st.session_state.user_id = result["id"]
+                st.session_state.username = result["username"]
+                st.rerun()
+            else:
+                st.error("Incorrect username or password. Please try again.")
+
+    with signup_tab:
+        with st.form("signup_form"):
+            new_username = st.text_input("Choose a username", key="signup_username")
+            new_password = st.text_input("Create a password", type="password", key="signup_password")
+            confirm_password = st.text_input("Confirm password", type="password", key="confirm_password")
+            signup_submit = st.form_submit_button("Create Account", use_container_width=True)
+
+        if signup_submit:
+            clean_username = new_username.strip()
+            if len(clean_username) < 3:
+                st.error("Username must contain at least 3 characters.")
+            elif len(new_password) < 8:
+                st.error("Password must contain at least 8 characters.")
+            elif new_password != confirm_password:
+                st.error("The passwords do not match.")
+            else:
+                success, message = create_user(clean_username, new_password)
+                if success:
+                    st.success("Account created! You can now log in using your credentials.")
+                else:
+                    st.error(message)
+
+    st.info("Each account has its own transactions and monthly budgets.")
+    st.stop()
+
+user_id = st.session_state.user_id
+
+with st.sidebar:
+    st.success(f"Logged in as **{st.session_state.username}**")
+    if st.button("Log out", use_container_width=True):
+        st.session_state.user_id = None
+        st.session_state.username = None
+        st.rerun()
+
+# --------------------------------
 # APPLICATION TITLE
 # --------------------------------
 
@@ -215,7 +280,7 @@ st.write("Welcome! Manage your income and expenses in one place.")
 # FETCH TRANSACTIONS
 # --------------------------------
 
-df = get_transactions()
+df = get_transactions(user_id)
 
 # --------------------------------
 # CALCULATE INCOME AND EXPENSES
@@ -247,7 +312,7 @@ st.subheader("🎯 Monthly Budget Management")
 current_month = date.today().strftime("%Y-%m")
 
 # Retrieve saved budget
-current_budget = get_monthly_budget(current_month)
+current_budget = get_monthly_budget(current_month, user_id)
 
 # Calculate current month's expenses
 if not df.empty:
@@ -283,7 +348,8 @@ with st.form("budget_form"):
 
             set_monthly_budget(
                 current_month,
-                new_budget
+                new_budget,
+                user_id
             )
 
             st.success("Monthly budget saved successfully!")
@@ -439,7 +505,8 @@ with st.form("transaction_form", clear_on_submit=True):
             amount,
             category,
             description,
-            date
+            date,
+            user_id
         )
 
         st.success("Transaction saved successfully!")
@@ -456,7 +523,7 @@ st.divider()
 st.subheader("📊 Expense Analytics")
 
 # Fetch transaction data
-analytics_df = get_transactions()
+analytics_df = get_transactions(user_id)
 
 if not analytics_df.empty:
 
@@ -576,7 +643,7 @@ st.divider()
 
 st.subheader("📋 Transaction Management")
 
-df = get_transactions()
+df = get_transactions(user_id)
 
 if not df.empty:
 
@@ -728,7 +795,8 @@ if not df.empty:
                 edit_amount,
                 edit_category,
                 edit_description,
-                edit_date
+                edit_date,
+                user_id
             )
 
             st.success("Transaction updated successfully!")
@@ -756,7 +824,7 @@ if not df.empty:
 
         if confirm_delete:
 
-            delete_transaction(selected_id)
+            delete_transaction(selected_id, user_id)
 
             st.success("Transaction deleted successfully!")
 
@@ -778,7 +846,7 @@ else:
 st.markdown("---")
 st.header("📊 Monthly Financial Comparison")
 
-comparison_df = get_transactions()
+comparison_df = get_transactions(user_id)
 
 if not comparison_df.empty:
 
@@ -893,7 +961,7 @@ else:
 st.markdown("---")
 st.header("🧠 Smart Spending Insights")
 
-insight_df = get_transactions()
+insight_df = get_transactions(user_id)
 
 if not insight_df.empty:
 
@@ -1015,7 +1083,7 @@ st.divider()
 st.subheader("📥 Download Financial Reports")
 
 # Fetch all transactions
-export_df = get_transactions()
+export_df = get_transactions(user_id)
 
 if not export_df.empty:
 
