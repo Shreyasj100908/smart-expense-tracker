@@ -109,7 +109,6 @@ The application is deployed using Streamlit Community Cloud.
 
 ## 🔮 Future Improvements
 
-- User authentication and individual accounts.
 - Persistent cloud database storage.
 - Category-wise budget management.
 - AI-powered spending insights.
